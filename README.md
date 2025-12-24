@@ -45,10 +45,10 @@ Visit the Withings Partner Hub:
 3. Fill in the application details:
    - **Application Name**: This name will be shown to users during authorization
    - **Description**: Brief description of your application
-   - **Callback URL**: Your redirect URI (e.g., `https://localhost:123/redirect`)
-     - For development: You can use `https://localhost:PORT/path`
+   - **Callback URL**: Your redirect URI (e.g., `http://localhost:12345/redirect`)
+     - For development: prefer `http://localhost:<high-port>/path` so the local helper can bind without TLS
      - Note: localhost URLs are limited to 10 users in development
-     - For production: Use a proper HTTPS URL (port 443)
+     - For production: use HTTPS on a public host you control
 
 ### Step 3: Get Your Credentials
 
@@ -70,7 +70,9 @@ Edit your `.env` file and add your credentials:
 ```env
 WITHINGS_CLIENT_ID=your_client_id_here
 WITHINGS_CLIENT_SECRET=your_client_secret_here
-WITHINGS_REDIRECT_URI=https://localhost:123/redirect
+WITHINGS_REDIRECT_URI=http://localhost:12345/redirect
+# Optional: adjust wait time (seconds) for receiving the browser callback (default 60)
+WITHINGS_CALLBACK_TIMEOUT=60
 ```
 
 **Important**: The `WITHINGS_REDIRECT_URI` must match EXACTLY what you registered in the dashboard (including protocol, port, and path).
@@ -83,7 +85,7 @@ The `get_auth_code.py` script handles the OAuth2 authorization flow to obtain ac
 
 This script automates the process of:
 1. Opening the Withings authorization page in your browser
-2. Prompting you to copy and paste the authorization code from the redirect URL
+2. Running a local HTTP callback server to capture the authorization code (no copy/paste)
 3. Exchanging the authorization code for access and refresh tokens
 4. Saving the tokens to your `.env` file for future use
 
@@ -107,14 +109,12 @@ python src/withings_data_collector/get_auth_code.py
 
 2. **Authorization Flow**
    - The script opens your browser to the Withings authorization page
-   - You (or the user) must log in and authorize the application
-   - After authorization, Withings redirects to your callback URL
+   - You log in and click “Allow”
+   - Withings redirects back to your configured redirect URI (e.g., `http://localhost:12345/redirect`)
 
-3. **Collect Authorization Code**
-   - Copy the full redirect URL from your browser's address bar
-   - The URL will look like: `https://localhost:123/redirect?code=AUTHORIZATION_CODE&state=...`
-   - Paste this URL when prompted by the script
-   - The script automatically extracts the authorization code
+3. **Local Callback Capture**
+   - A local HTTP server (started by the script) receives the redirect
+   - The code is captured automatically; no manual copy/paste
 
 4. **Token Exchange**
    - The script exchanges the authorization code for access and refresh tokens
@@ -127,10 +127,11 @@ python src/withings_data_collector/get_auth_code.py
 
 ### Important Notes
 
-- **Authorization codes expire in ~30 seconds** - be quick when copying and pasting
+- **Authorization codes expire in ~30 seconds** - complete browser auth promptly
 - **Authorization codes can only be used once** - if you need new tokens, run the script again
 - **Access tokens expire in ~3 hours** - use refresh tokens to get new access tokens without re-authorization
 - **Refresh tokens** - stored in `.env`, can be used to refresh access tokens without user interaction
+- **Callback timeout** - the script waits up to `WITHINGS_CALLBACK_TIMEOUT` seconds (default 60) for the browser redirect
 
 ### Troubleshooting
 
@@ -175,6 +176,15 @@ python src/withings_data_collector/get_auth_code.py
 1. The script will show the authorization URL in the terminal
 2. Copy and paste it into your browser manually
 3. Continue with the normal flow
+
+#### Browser redirects to HTTPS and callback hangs
+
+**Problem**: Redirect URI is set to `https://...` but the local helper listens on HTTP, so the request never reaches it.
+
+**Solution**:
+1. For local development, use `http://localhost:<port>/path` in both the Withings app and `.env`
+2. Ensure the port is >=1024 and free
+3. Re-run the script and complete the browser flow
 
 ### Configuration Files
 
