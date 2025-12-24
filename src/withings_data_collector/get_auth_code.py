@@ -19,7 +19,7 @@ from dotenv import load_dotenv, set_key
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 CONFIG_FILE = PROJECT_ROOT / "withings_config.toml"
-DEFAULT_EXPIRES_IN = 10800
+
 HTTP_TIMEOUT = 10.0
 CALLBACK_TIMEOUT = 300.0
 
@@ -66,7 +66,7 @@ def parse_token_response(data: dict) -> tuple[str, str, str | None, int]:
         body["access_token"],
         body["refresh_token"],
         body.get("userid"),
-        int(body.get("expires_in", DEFAULT_EXPIRES_IN)),
+        int(body.get("expires_in")),
     )
 
 
