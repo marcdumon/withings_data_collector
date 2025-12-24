@@ -34,7 +34,7 @@ class OAuthError(RuntimeError):
 def load_config() -> dict:
     if not CONFIG_FILE.is_file():
         raise ConfigError(f"Missing config file: {CONFIG_FILE}")
-    with CONFIG_FILE.open("rb") as f:
+    with CONFIG_FILE.open('rb') as f:
         return tomllib.load(f)
 
 
@@ -42,28 +42,38 @@ def load_credentials() -> tuple[str, str, str]:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
     load_dotenv(ENV_FILE)
-    client_id = os.getenv("WITHINGS_CLIENT_ID")
-    client_secret = os.getenv("WITHINGS_CLIENT_SECRET")
-    redirect_uri = os.getenv("WITHINGS_REDIRECT_URI")
+    client_id = os.getenv('WITHINGS_CLIENT_ID')
+    client_secret = os.getenv('WITHINGS_CLIENT_SECRET')
+    redirect_uri = os.getenv('WITHINGS_REDIRECT_URI')
     if not all((client_id, client_secret, redirect_uri)):
         raise ConfigError("Missing OAuth credentials")
     return client_id, client_secret, redirect_uri
 
 
 def save_tokens(access_token: str, refresh_token: str) -> None:
-    set_key(ENV_FILE, "WITHINGS_ACCESS_TOKEN", access_token)
-    set_key(ENV_FILE, "WITHINGS_REFRESH_TOKEN", refresh_token)
+    set_key(ENV_FILE, 'WITHINGS_ACCESS_TOKEN', access_token)
+    set_key(ENV_FILE, 'WITHINGS_REFRESH_TOKEN', refresh_token)
+
+
+def load_refresh_token() -> str:
+    if not ENV_FILE.is_file():
+        raise ConfigError(f"Missing env file: {ENV_FILE}")
+    load_dotenv(ENV_FILE)
+    refresh_token = os.getenv('WITHINGS_REFRESH_TOKEN')
+    if not refresh_token:
+        raise ConfigError("Missing refresh token in .env")
+    return refresh_token
 
 
 def parse_token_response(data: dict) -> tuple[str, str, str | None, int]:
-    body = data.get("body")
+    body = data.get('body')
     if not isinstance(body, dict):
         raise OAuthError(f"Invalid token response: {data}")
     return (
-        body["access_token"],
-        body["refresh_token"],
-        body.get("userid"),
-        int(body.get("expires_in")),
+        body['access_token'],
+        body['refresh_token'],
+        body.get('userid'),
+        int(body.get('expires_in')),
     )
 
 
@@ -169,12 +179,12 @@ def exchange_code(
     timeout: float,
 ) -> tuple[str, str, str | None, int]:
     payload = {
-        "action": "requesttoken",
-        "grant_type": "authorization_code",
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "code": code,
-        "redirect_uri": redirect_uri,
+        'action': 'requesttoken',
+        'grant_type': 'authorization_code',
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'code': code,
+        'redirect_uri': redirect_uri,
     }
     r = requests.post(token_url, data=payload, timeout=timeout)
     r.raise_for_status()
@@ -185,20 +195,20 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
     config = load_config()
     client_id, client_secret, redirect_uri = load_credentials()
 
-    api = config["api"]
-    oauth = config["oauth"]
-    http_timeout = float(oauth["http_timeout"])
-    callback_timeout = float(oauth["callback_timeout"])
+    api = config['api']
+    oauth = config['oauth']
+    http_timeout = float(oauth['http_timeout'])
+    callback_timeout = float(oauth['callback_timeout'])
 
-    scope = scope or oauth["default_scopes"]
+    scope = scope or oauth['default_scopes']
     state = secrets.token_urlsafe(32)
 
     auth_params = {
-        "response_type": "code",
-        "client_id": client_id,
-        "state": state,
-        "scope": scope,
-        "redirect_uri": redirect_uri,
+        'response_type': 'code',
+        'client_id': client_id,
+        'state': state,
+        'scope': scope,
+        'redirect_uri': redirect_uri,
     }
 
     auth_url = f"{api['account_url']}{api['auth_endpoint']}?{urlencode(auth_params)}"
@@ -228,6 +238,45 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "userid": userid,
+        "expires_in": expires_in,
+    }
+
+
+def refresh_authorization_tokens(
+    timeout: float | None = None,
+) -> dict[str, str | int | None]:
+    config = load_config()
+    client_id, client_secret, _ = load_credentials()
+    refresh_token = load_refresh_token()
+
+    api = config['api']
+    oauth = config['oauth']
+    http_timeout = float(oauth['http_timeout'])
+    timeout = float(timeout) if timeout is not None else http_timeout
+
+    token_url = f"{api['wbsapi_url']}{api['token_endpoint']}"
+    payload = {
+        'action': 'requesttoken',
+        'grant_type': 'refresh_token',
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'refresh_token': refresh_token,
+    }
+
+    r = requests.post(token_url, data=payload, timeout=timeout)
+    r.raise_for_status()
+    access_token, new_refresh_token, userid, expires_in = parse_token_response(r.json())
+
+    save_tokens(access_token, new_refresh_token)
+    logger.info("Tokens refreshed and saved to %s", ENV_FILE)
+    logger.info("Access token expires in %s hours", expires_in // 3600)
+    if userid:
+        logger.info("User ID: %s", userid)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
         "userid": userid,
         "expires_in": expires_in,
     }
