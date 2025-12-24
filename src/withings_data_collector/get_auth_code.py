@@ -20,9 +20,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 CONFIG_FILE = PROJECT_ROOT / "withings_config.toml"
 
-HTTP_TIMEOUT = 10.0
-CALLBACK_TIMEOUT = 300.0
-
 logger = logging.getLogger(__name__)
 
 
@@ -169,6 +166,7 @@ def exchange_code(
     client_secret: str,
     redirect_uri: str,
     token_url: str,
+    timeout: float,
 ) -> tuple[str, str, str | None, int]:
     payload = {
         "action": "requesttoken",
@@ -178,7 +176,7 @@ def exchange_code(
         "code": code,
         "redirect_uri": redirect_uri,
     }
-    r = requests.post(token_url, data=payload, timeout=HTTP_TIMEOUT)
+    r = requests.post(token_url, data=payload, timeout=timeout)
     r.raise_for_status()
     return parse_token_response(r.json())
 
@@ -189,6 +187,8 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
 
     api = config["api"]
     oauth = config["oauth"]
+    http_timeout = float(oauth["http_timeout"])
+    callback_timeout = float(oauth["callback_timeout"])
 
     scope = scope or oauth["default_scopes"]
     state = secrets.token_urlsafe(32)
@@ -206,7 +206,7 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
         auth_url=auth_url,
         redirect_uri=redirect_uri,
         expected_state=state,
-        timeout=CALLBACK_TIMEOUT,
+        timeout=callback_timeout,
     )
 
     token_url = f"{api['wbsapi_url']}{api['token_endpoint']}"
@@ -216,6 +216,7 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
         client_secret,
         redirect_uri,
         token_url,
+        http_timeout,
     )
 
     save_tokens(access_token, refresh_token)

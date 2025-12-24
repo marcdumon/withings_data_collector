@@ -17,4 +17,6 @@ default_scopes = "user.info,user.metrics,user.activity"
 
 # Token expiration (in seconds)
 access_token_expires_in = 10800  # 3 hours
+http_timeout = 10
+callback_timeout = 300
 

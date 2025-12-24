@@ -71,11 +71,13 @@ Edit your `.env` file and add your credentials:
 WITHINGS_CLIENT_ID=your_client_id_here
 WITHINGS_CLIENT_SECRET=your_client_secret_here
 WITHINGS_REDIRECT_URI=http://localhost:12345/redirect
-# Optional: adjust wait time (seconds) for receiving the browser callback (default 60)
-WITHINGS_CALLBACK_TIMEOUT=60
 ```
 
 **Important**: The `WITHINGS_REDIRECT_URI` must match EXACTLY what you registered in the dashboard (including protocol, port, and path).
+
+Timeouts are configured in `withings_config.toml` under `[oauth]`:
+- `http_timeout` (seconds) for the token exchange request
+- `callback_timeout` (seconds) the script waits for the browser redirect to hit the local callback server
 
 ## Using get_auth_code.py
 
@@ -131,7 +133,7 @@ python src/withings_data_collector/get_auth_code.py
 - **Authorization codes can only be used once** - if you need new tokens, run the script again
 - **Access tokens expire in ~3 hours** - use refresh tokens to get new access tokens without re-authorization
 - **Refresh tokens** - stored in `.env`, can be used to refresh access tokens without user interaction
-- **Callback timeout** - the script waits up to `WITHINGS_CALLBACK_TIMEOUT` seconds (default 60) for the browser redirect
+- **Callback timeout** - the script waits up to `callback_timeout` (from `withings_config.toml`) for the browser redirect; defaults to the value in the config
 
 ### Troubleshooting
 
