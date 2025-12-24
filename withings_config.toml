@@ -1,0 +1,20 @@
+# Configuration for Withings API and devices
+# This file contains all Withings-related configuration including:
+# - API endpoints
+# - Device parameters
+# - Data collection settings
+
+[api]
+# Withings API endpoints
+account_url = "https://account.withings.com"
+wbsapi_url = "https://wbsapi.withings.net"
+token_endpoint = "/v2/oauth2"
+auth_endpoint = "/oauth2_user/authorize2"
+
+[oauth]
+# Default OAuth scopes
+default_scopes = "user.info,user.metrics,user.activity"
+
+# Token expiration (in seconds)
+access_token_expires_in = 10800  # 3 hours
+

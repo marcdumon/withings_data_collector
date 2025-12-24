@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "withings-data-collector"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "matplotlib>=3.7.0",
+    "pandas>=2.0.0",
+    "requests>=2.32.3",
+    "python-dotenv>=1.0.0",
+]
+
+[dependency-groups]
+notebook = [
+    "ipykernel>=6.0.0",
+    "notebook>=7.0.0",
+]
+
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+
+
+
