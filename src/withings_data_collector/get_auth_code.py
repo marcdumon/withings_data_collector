@@ -58,7 +58,7 @@ def save_tokens(access_token: str, refresh_token: str) -> None:
 def load_refresh_token() -> str:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
-    load_dotenv(ENV_FILE)
+    load_dotenv(ENV_FILE, override=True)
     refresh_token = os.getenv('WITHINGS_REFRESH_TOKEN')
     if not refresh_token:
         raise ConfigError("Missing refresh token in .env")
