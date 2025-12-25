@@ -93,6 +93,7 @@ def make_callback_handler(
     expected_state: str,
     expected_path: str,
 ) -> type[http.server.BaseHTTPRequestHandler]:
+    
     class CallbackHandler(http.server.BaseHTTPRequestHandler):
         server_version = 'WithingsAuthServer/1.0'
         sys_version = ''
@@ -243,9 +244,7 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
     }
 
 
-def refresh_authorization_tokens(
-    timeout: float | None = None,
-) -> dict[str, str | int | None]:
+def refresh_authorization_tokens(timeout: float | None = None) -> dict[str, str | int | None]:
     config = load_config()
     client_id, client_secret, _ = load_credentials()
     refresh_token = load_refresh_token()
