@@ -135,6 +135,21 @@ python src/withings_data_collector/get_auth_code.py
 - **Refresh tokens** - stored in `.env`, can be used to refresh access tokens without user interaction
 - **Callback timeout** - the script waits up to `callback_timeout` (from `withings_config.toml`) for the browser redirect; defaults to the value in the config
 
+### Refreshing access tokens (no browser)
+
+Use the stored refresh token to get a new access token without re-authorizing:
+
+```bash
+python - <<'PY'
+from withings_data_collector.get_auth_code import refresh_authorization_tokens
+
+tokens = refresh_authorization_tokens()
+print(tokens)
+PY
+```
+
+This updates `WITHINGS_ACCESS_TOKEN` and `WITHINGS_REFRESH_TOKEN` in your `.env`.
+
 ### Troubleshooting
 
 #### "Redirect URI mismatch" Error
@@ -192,7 +207,7 @@ python src/withings_data_collector/get_auth_code.py
 
 - **`.env`**: Contains your credentials and tokens (not tracked in git)
 - **`.env.example`**: Template showing required environment variables
-- **`src/withings_data_collector/config.py`**: API endpoint configuration
+- **`withings_config.toml`**: API endpoints and OAuth settings
 
 ### Security Notes
 
