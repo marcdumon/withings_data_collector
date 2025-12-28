@@ -12,7 +12,12 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
-from withings_data_collector.get_auth_code import ConfigError, load_config, refresh_authorization_tokens
+from withings_data_collector.get_auth_code import (
+    ConfigError,
+    TokenRateLimitError,
+    load_config,
+    refresh_authorization_tokens,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / '.env'
@@ -35,8 +40,16 @@ def _load_access_token() -> str:
 def get_access_token(refresh: bool = False) -> str:
     """Return a valid access token, optionally refreshing first."""
     if refresh:
-        refresh_authorization_tokens()
-    return _load_access_token()
+        try:
+            refresh_authorization_tokens()
+        except TokenRateLimitError:
+            # Fall back to existing token when rate limited
+            token = _load_access_token()
+            return token
+        except Exception:
+            raise
+    token = _load_access_token()
+    return token
 
 
 def _authorized_get(url: str, access_token: str, params: dict[str, Any], timeout: float) -> dict:

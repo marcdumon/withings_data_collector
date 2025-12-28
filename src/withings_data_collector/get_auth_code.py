@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import requests
 from dotenv import load_dotenv, set_key
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 CONFIG_FILE = PROJECT_ROOT / "withings_config.toml"
@@ -29,6 +30,15 @@ class ConfigError(RuntimeError):
 
 class OAuthError(RuntimeError):
     pass
+
+
+class TokenRateLimitError(RuntimeError):
+    """Raised when token refresh hits provider-imposed cooldown (status 601)."""
+    def __init__(self, wait_seconds: int | None = None, payload: dict | None = None):
+        self.wait_seconds = wait_seconds
+        self.payload = payload or {}
+        msg = f"Token refresh rate limited. Wait_seconds={wait_seconds}"
+        super().__init__(msg)
 
 
 def load_config() -> dict:
@@ -265,7 +275,21 @@ def refresh_authorization_tokens(timeout: float | None = None) -> dict[str, str 
 
     r = requests.post(token_url, data=payload, timeout=timeout)
     r.raise_for_status()
-    access_token, new_refresh_token, userid, expires_in = parse_token_response(r.json())
+    response_json = r.json()
+    if not isinstance(response_json, dict):
+        raise OAuthError(f'Invalid token response (not dict): {response_json}')
+
+    status = response_json.get('status')
+    body = response_json.get('body')
+    if status != 0:
+        if status == 601:
+            wait_seconds = None
+            if isinstance(body, dict):
+                wait_seconds = body.get('wait_seconds')
+            raise TokenRateLimitError(wait_seconds=wait_seconds, payload=response_json)
+        raise OAuthError(f'Refresh failed with status {status}: {response_json}')
+
+    access_token, new_refresh_token, userid, expires_in = parse_token_response(response_json)
 
     save_tokens(access_token, new_refresh_token)
     logger.info("Tokens refreshed and saved to %s", ENV_FILE)
