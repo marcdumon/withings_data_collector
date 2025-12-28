@@ -56,11 +56,21 @@ def fetch_measurements_ui(project_root: str) -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        start_date, end_date = st.date_input(
+        date_input_result = st.date_input(
             "Date range",
             value=_default_dates(),
             help="Pull measurements between these dates.",
         )
+
+        # Handle the case where only one date is selected
+        if len(date_input_result) == 1:
+            st.warning("Please select both start and end dates for the date range.")
+            start_date = end_date = None
+        elif len(date_input_result) == 2:
+            start_date, end_date = date_input_result
+        else:
+            st.error("Invalid date range selection.")
+            start_date = end_date = None
     with col2:
         meastype = st.number_input(
             "Measurement type (optional)",
@@ -82,7 +92,7 @@ def fetch_measurements_ui(project_root: str) -> None:
         disabled=not save_sqlite,
     )
 
-    if st.button("Fetch measurements", type="primary"):
+    if st.button("Fetch measurements", type="primary", disabled=(start_date is None or end_date is None)):
         try:
             start_ts, end_ts = _date_range_to_timestamps(start_date, end_date)
             data = fetch_and_save_measurements(
@@ -104,11 +114,22 @@ def fetch_measurements_ui(project_root: str) -> None:
 def fetch_activity_ui(project_root: str) -> None:
     st.subheader("Activity")
 
-    start_date, end_date = st.date_input(
+    date_input_result = st.date_input(
         "Date range",
         value=_default_dates(),
         help="Pull activity between these dates.",
+        key="activity_date_range",  # Add unique key to avoid conflicts
     )
+
+    # Handle the case where only one date is selected
+    if len(date_input_result) == 1:
+        st.warning("Please select both start and end dates for the date range.")
+        start_date = end_date = None
+    elif len(date_input_result) == 2:
+        start_date, end_date = date_input_result
+    else:
+        st.error("Invalid date range selection.")
+        start_date = end_date = None
 
     save_json = st.checkbox("Save to JSON file", value=False, key="activity_json")
     json_path = st.text_input(
@@ -126,7 +147,7 @@ def fetch_activity_ui(project_root: str) -> None:
         key="activity_sqlite_path",
     )
 
-    if st.button("Fetch activity", type="primary"):
+    if st.button("Fetch activity", type="primary", disabled=(start_date is None or end_date is None)):
         try:
             data = fetch_and_save_activity(
                 startdateymd=start_date,
