@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -110,44 +109,13 @@ def get_activity(
     return _authorized_get(url, access_token, params, timeout)
 
 
-def save_json(data: dict, path: str | Path) -> Path:
-    dest = Path(path)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with dest.open('w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    return dest
 
-
-def save_raw_to_sqlite(payload: dict, db_path: str | Path, endpoint: str) -> None:
-    """Persist raw payload into sqlite with endpoint tag."""
-    db_file = Path(db_path)
-    db_file.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_file) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS withings_raw (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                endpoint TEXT NOT NULL,
-                retrieved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                payload TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "INSERT INTO withings_raw (endpoint, payload) VALUES (?, ?)",
-            (endpoint, json.dumps(payload)),
-        )
-        conn.commit()
-
-
-def fetch_and_save_measurements(
+def fetch_measurements(
     startdate: int | None = None,
     enddate: int | None = None,
     lastupdate: int | None = None,
     meastype: int | None = None,
     refresh_token: bool = False,
-    save_path: str | Path | None = None,
-    sqlite_db: str | Path | None = None,
 ) -> dict:
     config = load_config()
     api = config['api']
@@ -165,20 +133,14 @@ def fetch_and_save_measurements(
         meastype=meastype,
     )
 
-    if save_path:
-        save_json(data, save_path)
-    if sqlite_db:
-        save_raw_to_sqlite(data, sqlite_db, endpoint='measure')
     return data
 
 
-def fetch_and_save_activity(
+def fetch_activity(
     startdateymd: str | date | None = None,
     enddateymd: str | date | None = None,
     lastupdate: int | None = None,
     refresh_token: bool = False,
-    save_path: str | Path | None = None,
-    sqlite_db: str | Path | None = None,
 ) -> dict:
     config = load_config()
     api = config['api']
@@ -195,10 +157,6 @@ def fetch_and_save_activity(
         lastupdate=lastupdate,
     )
 
-    if save_path:
-        save_json(data, save_path)
-    if sqlite_db:
-        save_raw_to_sqlite(data, sqlite_db, endpoint='activity')
     return data
 
 
@@ -209,7 +167,7 @@ def _demo() -> None:
     start_ts = int(datetime.combine(start, datetime.min.time()).timestamp())
     end_ts = int(datetime.combine(today, datetime.min.time()).timestamp())
 
-    measures = fetch_and_save_measurements(
+    measures = fetch_measurements(
         startdate=start_ts,
         enddate=end_ts,
         refresh_token=True,

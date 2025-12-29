@@ -7,8 +7,8 @@ import streamlit as st
 
 from withings_data_collector.get_auth_code import ConfigError
 from withings_data_collector.get_data import (
-    fetch_and_save_activity,
-    fetch_and_save_measurements,
+    fetch_activity,
+    fetch_measurements,
     get_access_token,
 )
 
@@ -78,30 +78,15 @@ def fetch_measurements_ui(project_root: str) -> None:
             placeholder="Leave blank for all types",
         )
 
-    save_json = st.checkbox("Save to JSON file", value=False)
-    json_path = st.text_input(
-        "JSON output path",
-        value=f"{project_root}/data/measurements.json",
-        disabled=not save_json,
-    )
-
-    save_sqlite = st.checkbox("Save to SQLite db", value=False)
-    sqlite_path = st.text_input(
-        "SQLite db path",
-        value=f"{project_root}/data/withings.db",
-        disabled=not save_sqlite,
-    )
 
     if st.button("Fetch measurements", type="primary", disabled=(start_date is None or end_date is None)):
         try:
             start_ts, end_ts = _date_range_to_timestamps(start_date, end_date)
-            data = fetch_and_save_measurements(
+            data = fetch_measurements(
                 startdate=start_ts,
                 enddate=end_ts,
                 meastype=int(meastype) if meastype is not None else None,
                 refresh_token=True,
-                save_path=json_path if save_json else None,
-                sqlite_db=sqlite_path if save_sqlite else None,
             )
             st.json(data)
             _render_status("Measurements fetched.")
@@ -131,30 +116,13 @@ def fetch_activity_ui(project_root: str) -> None:
         st.error("Invalid date range selection.")
         start_date = end_date = None
 
-    save_json = st.checkbox("Save to JSON file", value=False, key="activity_json")
-    json_path = st.text_input(
-        "JSON output path",
-        value=f"{project_root}/data/activity.json",
-        disabled=not save_json,
-        key="activity_json_path",
-    )
-
-    save_sqlite = st.checkbox("Save to SQLite db", value=False, key="activity_sqlite")
-    sqlite_path = st.text_input(
-        "SQLite db path",
-        value=f"{project_root}/data/withings.db",
-        disabled=not save_sqlite,
-        key="activity_sqlite_path",
-    )
 
     if st.button("Fetch activity", type="primary", disabled=(start_date is None or end_date is None)):
         try:
-            data = fetch_and_save_activity(
+            data = fetch_activity(
                 startdateymd=start_date,
                 enddateymd=end_date,
                 refresh_token=True,
-                save_path=json_path if save_json else None,
-                sqlite_db=sqlite_path if save_sqlite else None,
             )
             st.json(data)
             _render_status("Activity fetched.")
