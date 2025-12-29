@@ -11,6 +11,10 @@ from withings_data_collector.get_data import (
     fetch_measurements,
     get_access_token,
 )
+from withings_data_collector.measures import (
+    MEASURE_TYPES,
+    format_measure_for_display,
+)
 
 st.set_page_config(
     page_title="Withings Data Collector",
@@ -89,6 +93,27 @@ def fetch_measurements_ui(project_root: str) -> None:
                 refresh_token=True,
             )
             st.json(data)
+            # Render a compact, SI-only formatted table of measurements using our
+            # canonical mapping. We do not change stored payloads here; this is
+            # display-only formatting.
+            measuregrps = data.get('body', {}).get('measuregrps', [])
+            if measuregrps:
+                st.markdown('---')
+                st.write("Formatted measurements:")
+                rows = []
+                for grp in measuregrps:
+                    ts = int(grp.get('date', 0))
+                    dt = datetime.fromtimestamp(ts)
+                    for m in grp.get('measures', []):
+                        try:
+                            mtype = int(m.get('type'))
+                        except Exception:
+                            mtype = -1
+                        name = MEASURE_TYPES.get(mtype, {}).get('name', f'Type {mtype}')
+                        formatted = format_measure_for_display(m)
+                        rows.append({'datetime': dt.isoformat(), 'measurement': name, 'value': formatted})
+                if rows:
+                    st.table(rows)
             _render_status("Measurements fetched.")
         except ConfigError as exc:
             _render_status(f"Config error: {exc}", success=False)
