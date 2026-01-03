@@ -34,9 +34,9 @@ class OAuthError(RuntimeError):
 
 class TokenRateLimitError(RuntimeError):
     """Raised when token refresh hits provider-imposed cooldown (status 601)."""
-    def __init__(self, wait_seconds: int | None = None, payload: dict | None = None):
+
+    def __init__(self, wait_seconds: int | None = None):
         self.wait_seconds = wait_seconds
-        self.payload = payload or {}
         msg = f"Token refresh rate limited. Wait_seconds={wait_seconds}"
         super().__init__(msg)
 
@@ -48,7 +48,7 @@ def load_config() -> dict:
         return tomllib.load(f)
 
 
-def load_credentials() -> tuple[str, str, str]:
+def load_credentials() -> tuple[str | None, str | None, str | None]:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
     load_dotenv(ENV_FILE)
@@ -75,16 +75,11 @@ def load_refresh_token() -> str:
     return refresh_token
 
 
-def parse_token_response(data: dict) -> tuple[str, str, str | None, int]:
+def parse_token_response(data: dict) -> tuple[str, str, str, int]:
     body = data.get('body')
     if not isinstance(body, dict):
         raise OAuthError(f"Invalid token response: {data}")
-    return (
-        body['access_token'],
-        body['refresh_token'],
-        body.get('userid'),
-        int(body.get('expires_in')),
-    )
+    return (body['access_token'], body['refresh_token'], body['userid'], body['expires_in'])
 
 
 @dataclass
@@ -103,7 +98,6 @@ def make_callback_handler(
     expected_state: str,
     expected_path: str,
 ) -> type[http.server.BaseHTTPRequestHandler]:
-    
     class CallbackHandler(http.server.BaseHTTPRequestHandler):
         server_version = 'WithingsAuthServer/1.0'
         sys_version = ''
@@ -199,6 +193,7 @@ def exchange_code(
     }
     r = requests.post(token_url, data=payload, timeout=timeout)
     r.raise_for_status()
+
     return parse_token_response(r.json())
 
 
@@ -286,9 +281,8 @@ def refresh_authorization_tokens(timeout: float | None = None) -> dict[str, str 
             wait_seconds = None
             if isinstance(body, dict):
                 wait_seconds = body.get('wait_seconds')
-            raise TokenRateLimitError(wait_seconds=wait_seconds, payload=response_json)
+            raise TokenRateLimitError(wait_seconds=wait_seconds)
         raise OAuthError(f'Refresh failed with status {status}: {response_json}')
-
     access_token, new_refresh_token, userid, expires_in = parse_token_response(response_json)
 
     save_tokens(access_token, new_refresh_token)
