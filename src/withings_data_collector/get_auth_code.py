@@ -11,12 +11,22 @@ import tomllib
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import parse_qs, urlencode, urlparse
+import urllib.parse
 
 import requests
-import dotenv 
+import dotenv
 
+''' XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Other technical notes
 
+ReusableTCPServer.allow_reuse_address = True avoids TIME_WAIT bind issues.
+
+State validation happens twice, handler and caller, which is correct but redundant.
+
+No logging suppression in BaseHTTPRequestHandler, so stderr noise may appear.
+
+Tokens are written in plaintext .env, acceptable only for local tooling.
+'''
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 CONFIG_FILE = PROJECT_ROOT / "withings_config.toml"
@@ -48,14 +58,14 @@ def load_config() -> dict:
         return tomllib.load(f)
 
 
-def load_credentials() -> tuple[str , str, str ]:
+def load_credentials() -> tuple[str, str, str]:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
     dotenv.load_dotenv(ENV_FILE, override=True)
     client_id = os.getenv('WITHINGS_CLIENT_ID')
     client_secret = os.getenv('WITHINGS_CLIENT_SECRET')
     redirect_uri = os.getenv('WITHINGS_REDIRECT_URI')
-    if not(client_id and client_secret and redirect_uri):
+    if not (client_id and client_secret and redirect_uri):
         raise ConfigError("Missing OAuth credentials")
     return client_id, client_secret, redirect_uri
 
@@ -102,18 +112,18 @@ def make_callback_handler(
         server_version = 'WithingsAuthServer/1.0'
         sys_version = ''
 
-        def log_message(self, format: str, *args) -> None:
+        def log_message(self, format: str, *args) -> None:  # Suppress logging noise
             return
 
         def do_GET(self) -> None:
-            parsed = urlparse(self.path)
+            parsed = urllib.parse.urlparse(self.path)
             if parsed.path != expected_path:
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Not found.")
                 return
 
-            params = parse_qs(parsed.query)
+            params = urllib.parse.parse_qs(parsed.query)
             code = params.get('code', [None])[0]
             state = params.get('state', [None])[0]
 
@@ -145,7 +155,7 @@ def wait_for_authorization_code(
     expected_state: str,
     timeout: float,
 ) -> str:
-    parsed = urlparse(redirect_uri)
+    parsed = urllib.parse.urlparse(redirect_uri)
     if not parsed.hostname or not parsed.port:
         raise ConfigError("WITHINGS_REDIRECT_URI must include host and port.")
 
@@ -217,7 +227,7 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
         'redirect_uri': redirect_uri,
     }
 
-    auth_url = f"{api['account_url']}{api['auth_endpoint']}?{urlencode(auth_params)}"
+    auth_url = f"{api['account_url']}{api['auth_endpoint']}?{urllib.parse.urlencode(auth_params)}"
     code = wait_for_authorization_code(
         auth_url=auth_url,
         redirect_uri=redirect_uri,
