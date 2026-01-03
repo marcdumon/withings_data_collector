@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import requests
-from dotenv import load_dotenv, set_key
+import dotenv 
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -51,25 +51,24 @@ def load_config() -> dict:
 def load_credentials() -> tuple[str , str, str ]:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
-    load_dotenv(ENV_FILE)
+    dotenv.load_dotenv(ENV_FILE)
     client_id = os.getenv('WITHINGS_CLIENT_ID')
     client_secret = os.getenv('WITHINGS_CLIENT_SECRET')
     redirect_uri = os.getenv('WITHINGS_REDIRECT_URI')
-    # if not all((client_id, client_secret, redirect_uri)): (pyright checker complains about this)
     if not(client_id and client_secret and redirect_uri):
         raise ConfigError("Missing OAuth credentials")
     return client_id, client_secret, redirect_uri
 
 
 def save_tokens(access_token: str, refresh_token: str) -> None:
-    set_key(ENV_FILE, 'WITHINGS_ACCESS_TOKEN', access_token)
-    set_key(ENV_FILE, 'WITHINGS_REFRESH_TOKEN', refresh_token)
+    dotenv.set_key(ENV_FILE, 'WITHINGS_ACCESS_TOKEN', access_token)
+    dotenv.set_key(ENV_FILE, 'WITHINGS_REFRESH_TOKEN', refresh_token)
 
 
 def load_refresh_token() -> str:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
-    load_dotenv(ENV_FILE, override=True)
+    dotenv.load_dotenv(ENV_FILE, override=True)
     refresh_token = os.getenv('WITHINGS_REFRESH_TOKEN')
     if not refresh_token:
         raise ConfigError("Missing refresh token in .env")
