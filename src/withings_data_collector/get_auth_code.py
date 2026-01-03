@@ -102,7 +102,7 @@ def make_callback_handler(
         server_version = 'WithingsAuthServer/1.0'
         sys_version = ''
 
-        def log_message(self, fmt: str, *args) -> None:
+        def log_message(self, format: str, *args) -> None:
             return
 
         def do_GET(self) -> None:
