@@ -51,7 +51,7 @@ def load_config() -> dict:
 def load_credentials() -> tuple[str , str, str ]:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
-    dotenv.load_dotenv(ENV_FILE)
+    dotenv.load_dotenv(ENV_FILE, override=True)
     client_id = os.getenv('WITHINGS_CLIENT_ID')
     client_secret = os.getenv('WITHINGS_CLIENT_SECRET')
     redirect_uri = os.getenv('WITHINGS_REDIRECT_URI')
