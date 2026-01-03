@@ -48,14 +48,15 @@ def load_config() -> dict:
         return tomllib.load(f)
 
 
-def load_credentials() -> tuple[str | None, str | None, str | None]:
+def load_credentials() -> tuple[str , str, str ]:
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
     load_dotenv(ENV_FILE)
     client_id = os.getenv('WITHINGS_CLIENT_ID')
     client_secret = os.getenv('WITHINGS_CLIENT_SECRET')
     redirect_uri = os.getenv('WITHINGS_REDIRECT_URI')
-    if not all((client_id, client_secret, redirect_uri)):
+    # if not all((client_id, client_secret, redirect_uri)): (pyright checker complains about this)
+    if not(client_id and client_secret and redirect_uri):
         raise ConfigError("Missing OAuth credentials")
     return client_id, client_secret, redirect_uri
 
