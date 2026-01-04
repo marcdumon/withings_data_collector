@@ -98,7 +98,7 @@ class CallbackResult:
     state: str | None = None
 
 
-class ReusableTCPServer(socketserver.TCPServer):
+class OAuthRedirectServer(socketserver.TCPServer):
     allow_reuse_address = True
 
 
@@ -108,7 +108,7 @@ def make_callback_handler(
     expected_state: str,
     expected_path: str,
 ) -> type[http.server.BaseHTTPRequestHandler]:
-    class CallbackHandler(http.server.BaseHTTPRequestHandler):
+    class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
         server_version = 'WithingsAuthServer/1.0'
         sys_version = ''
 
@@ -146,7 +146,7 @@ def make_callback_handler(
             self.end_headers()
             self.wfile.write(b"Authorization received. You may close this tab.")
 
-    return CallbackHandler
+    return OAuthCallbackHandler
 
 
 def wait_for_authorization_code(
@@ -164,7 +164,7 @@ def wait_for_authorization_code(
     event = threading.Event()
     handler_cls = make_callback_handler(result, event, expected_state, expected_path)
 
-    with ReusableTCPServer((parsed.hostname, parsed.port), handler_cls) as httpd:
+    with OAuthRedirectServer((parsed.hostname, parsed.port), handler_cls) as httpd:
         server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
         server_thread.start()
 
