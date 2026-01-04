@@ -12,11 +12,12 @@ token_endpoint = "/v2/oauth2"
 auth_endpoint = "/oauth2_user/authorize2"
 
 [oauth]
-# Default OAuth scopes
+#  OAuth scopes
+allowed_scopes = "user.info,user.metrics,user.activity,user.sleepevents" # All available scopes
 default_scopes = "user.info,user.metrics,user.activity"
 
 # Token expiration (in seconds)
 access_token_expires_in = 10800  # 3 hours
 http_timeout = 10
-callback_timeout = 300
+callback_timeout = 30
 
