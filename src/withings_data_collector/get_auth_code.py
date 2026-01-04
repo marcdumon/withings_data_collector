@@ -207,7 +207,7 @@ def exchange_code(
     return parse_token_response(r.json())
 
 
-def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | None]:
+def get_authorization_tokens(scopes: str | None = None) -> dict[str, str | int | None]:
     config = load_config()
     client_id, client_secret, redirect_uri = load_credentials()
 
@@ -216,14 +216,22 @@ def get_authorization_tokens(scope: str | None = None) -> dict[str, str | int | 
     http_timeout = float(oauth['http_timeout'])
     callback_timeout = float(oauth['callback_timeout'])
 
-    scope = scope or oauth['default_scopes']
+    if scopes is None:
+        scopes = oauth['default_scopes']
+    else:
+        scope_list = scopes.split(',')
+        for scope in scope_list :
+            if scope not in oauth['allowed_scopes']:
+                raise OAuthError(f"Invalid scope: {scope}")
+        scopes = ','.join(scope_list)   # Join the list back into a string
+
     state = secrets.token_urlsafe(32)
 
     auth_params = {
         'response_type': 'code',
         'client_id': client_id,
         'state': state,
-        'scope': scope,
+        'scope': scopes,
         'redirect_uri': redirect_uri,
     }
 
@@ -310,7 +318,7 @@ def refresh_authorization_tokens(timeout: float | None = None) -> dict[str, str 
 
 
 def main() -> None:
-    get_authorization_tokens()
+    get_authorization_tokens("user.info,user.metrics,user.activity")
 
 
 if __name__ == "__main__":
