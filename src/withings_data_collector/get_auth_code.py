@@ -149,7 +149,7 @@ def make_callback_handler(
     return OAuthCallbackHandler
 
 
-def wait_for_authorization_code(
+def obtain_authorization_code_via_browser(
     auth_url: str,
     redirect_uri: str,
     expected_state: str,
@@ -236,7 +236,7 @@ def get_authorization_tokens(scopes: str | None = None) -> dict[str, str | int |
     }
 
     auth_url = f"{api['account_url']}{api['auth_endpoint']}?{urllib.parse.urlencode(auth_params)}"
-    code = wait_for_authorization_code(
+    code = obtain_authorization_code_via_browser(
         auth_url=auth_url,
         redirect_uri=redirect_uri,
         expected_state=state,
