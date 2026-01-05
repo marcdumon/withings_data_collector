@@ -16,17 +16,7 @@ import urllib.parse
 import requests
 import dotenv
 
-''' XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-Other technical notes
 
-ReusableTCPServer.allow_reuse_address = True avoids TIME_WAIT bind issues.
-
-State validation happens twice, handler and caller, which is correct but redundant.
-
-No logging suppression in BaseHTTPRequestHandler, so stderr noise may appear.
-
-Tokens are written in plaintext .env, acceptable only for local tooling.
-'''
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 CONFIG_FILE = PROJECT_ROOT / "withings_config.toml"
@@ -35,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigError(RuntimeError):
-    pass
+    """Raised when configuration loading or validation fails."""
 
 
 class OAuthError(RuntimeError):
-    pass
+    """Raised when OAuth authorization or token exchange fails."""
 
 
 class TokenRateLimitError(RuntimeError):
@@ -52,6 +42,14 @@ class TokenRateLimitError(RuntimeError):
 
 
 def load_config() -> dict:
+    """Load configuration from TOML file.
+
+    Returns:
+        dict: Configuration dictionary loaded from withings_config.toml
+
+    Raises:
+        ConfigError: If config file is missing or cannot be read
+    """
     if not CONFIG_FILE.is_file():
         raise ConfigError(f"Missing config file: {CONFIG_FILE}")
     with CONFIG_FILE.open('rb') as f:
@@ -59,6 +57,14 @@ def load_config() -> dict:
 
 
 def load_credentials() -> tuple[str, str, str]:
+    """Load OAuth credentials from environment variables.
+
+    Returns:
+        tuple[str, str, str]: Tuple of (client_id, client_secret, redirect_uri)
+
+    Raises:
+        ConfigError: If .env file is missing or required credentials are not set
+    """
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
     dotenv.load_dotenv(ENV_FILE, override=True)
@@ -71,11 +77,25 @@ def load_credentials() -> tuple[str, str, str]:
 
 
 def save_tokens(access_token: str, refresh_token: str) -> None:
+    """Save access and refresh tokens to .env file.
+
+    Args:
+        access_token: The OAuth access token
+        refresh_token: The OAuth refresh token
+    """
     dotenv.set_key(ENV_FILE, 'WITHINGS_ACCESS_TOKEN', access_token)
     dotenv.set_key(ENV_FILE, 'WITHINGS_REFRESH_TOKEN', refresh_token)
 
 
 def load_refresh_token() -> str:
+    """Load refresh token from environment variables.
+
+    Returns:
+        str: The refresh token
+
+    Raises:
+        ConfigError: If .env file is missing or refresh token is not set
+    """
     if not ENV_FILE.is_file():
         raise ConfigError(f"Missing env file: {ENV_FILE}")
     dotenv.load_dotenv(ENV_FILE, override=True)
@@ -86,6 +106,17 @@ def load_refresh_token() -> str:
 
 
 def parse_token_response(data: dict) -> tuple[str, str, str, int]:
+    """Parse token response from Withings API.
+
+    Args:
+        data: Response dictionary from token endpoint
+
+    Returns:
+        tuple[str, str, str, int]: Tuple of (access_token, refresh_token, userid, expires_in)
+
+    Raises:
+        OAuthError: If response format is invalid
+    """
     body = data.get('body')
     if not isinstance(body, dict):
         raise OAuthError(f"Invalid token response: {data}")
@@ -94,11 +125,13 @@ def parse_token_response(data: dict) -> tuple[str, str, str, int]:
 
 @dataclass
 class CallbackResult:
+    """Container for OAuth callback parameters received from authorization redirect."""
     code: str | None = None
     state: str | None = None
 
 
 class OAuthRedirectServer(socketserver.TCPServer):
+    """TCP server for handling OAuth redirect callbacks."""
     allow_reuse_address = True
 
 
@@ -108,7 +141,19 @@ def make_callback_handler(
     expected_state: str,
     expected_path: str,
 ) -> type[http.server.BaseHTTPRequestHandler]:
+    """Create an HTTP request handler class for OAuth callbacks.
+
+    Args:
+        result: CallbackResult instance to store received parameters
+        event: Threading event to signal when callback is received
+        expected_state: Expected OAuth state parameter for CSRF protection
+        expected_path: Expected callback URL path
+
+    Returns:
+        HTTP request handler class configured for OAuth callback handling
+    """
     class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
+        """HTTP request handler for OAuth authorization code callbacks."""
         server_version = 'WithingsAuthServer/1.0'
         sys_version = ''
 
@@ -155,6 +200,21 @@ def obtain_authorization_code_via_browser(
     expected_state: str,
     timeout: float,
 ) -> str:
+    """Obtain authorization code by opening browser and handling redirect callback.
+
+    Args:
+        auth_url: Full authorization URL to open in browser
+        redirect_uri: OAuth redirect URI with host and port
+        expected_state: Expected OAuth state parameter for validation
+        timeout: Timeout in seconds to wait for callback
+
+    Returns:
+        str: Authorization code received from callback
+
+    Raises:
+        ConfigError: If redirect URI is malformed
+        OAuthError: If authorization times out or state validation fails
+    """
     parsed = urllib.parse.urlparse(redirect_uri)
     if not parsed.hostname or not parsed.port:
         raise ConfigError("WITHINGS_REDIRECT_URI must include host and port.")
@@ -193,6 +253,22 @@ def exchange_code(
     token_url: str,
     timeout: float,
 ) -> tuple[str, str, str | None, int]:
+    """Exchange authorization code for access and refresh tokens.
+
+    Args:
+        code: Authorization code received from OAuth callback
+        client_id: OAuth client ID
+        client_secret: OAuth client secret
+        redirect_uri: OAuth redirect URI
+        token_url: Withings token endpoint URL
+        timeout: HTTP request timeout in seconds
+
+    Returns:
+        tuple[str, str, str | None, int]: Tuple of (access_token, refresh_token, userid, expires_in)
+
+    Raises:
+        requests.HTTPError: If token request fails
+    """
     payload = {
         'action': 'requesttoken',
         'grant_type': 'authorization_code',
@@ -208,6 +284,19 @@ def exchange_code(
 
 
 def get_authorization_tokens(scopes: str | None = None) -> dict[str, str | int | None]:
+    """Perform complete OAuth authorization flow to obtain access tokens.
+
+    Args:
+        scopes: Comma-separated string of OAuth scopes. If None, uses default scopes
+               from config. Must be subset of allowed_scopes in config.
+
+    Returns:
+        dict[str, str | int | None]: Dictionary containing access_token, refresh_token,
+                                    userid, and expires_in
+
+    Raises:
+        OAuthError: If invalid scopes provided or authorization fails
+    """
     config = load_config()
     client_id, client_secret, redirect_uri = load_credentials()
 
@@ -220,10 +309,10 @@ def get_authorization_tokens(scopes: str | None = None) -> dict[str, str | int |
         scopes = oauth['default_scopes']
     else:
         scope_list = scopes.split(',')
-        for scope in scope_list :
+        for scope in scope_list:
             if scope not in oauth['allowed_scopes']:
                 raise OAuthError(f"Invalid scope: {scope}")
-        scopes = ','.join(scope_list)   # Join the list back into a string
+        scopes = ','.join(scope_list)  # Join the list back into a string
 
     state = secrets.token_urlsafe(32)
 
@@ -268,6 +357,19 @@ def get_authorization_tokens(scopes: str | None = None) -> dict[str, str | int |
 
 
 def refresh_authorization_tokens(timeout: float | None = None) -> dict[str, str | int | None]:
+    """Refresh OAuth access token using stored refresh token.
+
+    Args:
+        timeout: HTTP request timeout in seconds. If None, uses config default.
+
+    Returns:
+        dict[str, str | int | None]: Dictionary containing access_token, refresh_token,
+                                    userid, and expires_in
+
+    Raises:
+        TokenRateLimitError: If token refresh is rate limited by provider
+        OAuthError: If refresh fails for other reasons
+    """
     config = load_config()
     client_id, client_secret, _ = load_credentials()
     refresh_token = load_refresh_token()
@@ -318,6 +420,10 @@ def refresh_authorization_tokens(timeout: float | None = None) -> dict[str, str 
 
 
 def main() -> None:
+    """Main entry point for OAuth authorization flow.
+
+    Performs authorization with default scopes for user info, metrics, and activity.
+    """
     get_authorization_tokens("user.info,user.metrics,user.activity")
 
 
