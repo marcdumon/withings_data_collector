@@ -28,7 +28,12 @@ def _default_dates(days: int = 7) -> tuple[date, date]:
     return today - timedelta(days=days), today
 
 
-def _date_range_to_timestamps(start: date, end: date) -> tuple[int, int]:
+def _date_range_to_timestamps(start: date | None, end: date | None) -> tuple[int, int]:
+    if not start:
+        start = date.today() - timedelta(days=7)
+    if not end:
+        end = date.today()
+
     start_ts = int(datetime.combine(start, datetime.min.time()).timestamp())
     end_ts = int(datetime.combine(end, datetime.min.time()).timestamp())
     return start_ts, end_ts
@@ -82,8 +87,11 @@ def fetch_measurements_ui(project_root: str) -> None:
             placeholder="Leave blank for all types",
         )
 
-
-    if st.button("Fetch measurements", type="primary", disabled=(start_date is None or end_date is None)):
+    if st.button(
+        "Fetch measurements",
+        type="primary",
+        disabled=(start_date is None or end_date is None),
+    ):
         try:
             start_ts, end_ts = _date_range_to_timestamps(start_date, end_date)
             data = fetch_measurements(
@@ -110,8 +118,15 @@ def fetch_measurements_ui(project_root: str) -> None:
                         except Exception:
                             mtype = -1
                         name = MEASURE_TYPES.get(mtype, {}).get('name', f'Type {mtype}')
+                        name = f"{mtype} - {name}"
                         formatted = format_measure_for_display(m)
-                        rows.append({'datetime': dt.isoformat(), 'measurement': name, 'value': formatted})
+                        rows.append(
+                            {
+                                'datetime': dt.isoformat(),
+                                'measurement': name,
+                                'value': formatted,
+                            }
+                        )
                 if rows:
                     st.table(rows)
             _render_status("Measurements fetched.")
@@ -141,8 +156,11 @@ def fetch_activity_ui(project_root: str) -> None:
         st.error("Invalid date range selection.")
         start_date = end_date = None
 
-
-    if st.button("Fetch activity", type="primary", disabled=(start_date is None or end_date is None)):
+    if st.button(
+        "Fetch activity",
+        type="primary",
+        disabled=(start_date is None or end_date is None),
+    ):
         try:
             data = fetch_activity(
                 startdateymd=start_date,
@@ -174,4 +192,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
