@@ -1,7 +1,6 @@
 """Streamlit UI for Withings data collection."""
 
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
